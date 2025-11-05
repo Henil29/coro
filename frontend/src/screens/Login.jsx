@@ -1,6 +1,7 @@
-import React, { useState } from 'react';
+import React, { useState, useContext } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import axios from '../config/axios.js'
+import { UserContext } from '../context/user.context'
 
 const Login = () => {
     const navigate = useNavigate();
@@ -8,6 +9,8 @@ const Login = () => {
         email: '',
         password: ''
     });
+
+    const { setUser } = useContext(UserContext);
 
     const handleChange = (e) => {
         const { name, value } = e.target;
@@ -19,6 +22,8 @@ const Login = () => {
         const response = await axios.post('/user/login', formData)
             .then((res) => {
                 console.log('Login successful:', res.data);
+                localStorage.setItem('token', res.data.token);
+                setUser(res.data.user);
                 navigate('/');
             }).catch((error) => {
                 console.error('Login failed:', error.response?.data || error.message);
