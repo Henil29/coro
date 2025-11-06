@@ -7,6 +7,7 @@ import { connectDB } from './db/db.js';
 
 // import routes
 import userRoutes from './routes/user.routes.js';
+import projectRoutes from './routes/project.routes.js';
 const app = express();
 
 connectDB();
@@ -20,5 +21,6 @@ app.use(express.urlencoded({ extended: true }));
 
 // use Routes
 app.use('/api/user', userRoutes);
+app.use('/api/project', projectRoutes);
 
 export default app;

@@ -1,6 +1,7 @@
-import React, { useState } from 'react';
+import React, { useContext, useState } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import axios from '../config/axios.js'
+import { UserContext } from '../context/user.context'
 
 const Register = () => {
     const navigate = useNavigate();
@@ -9,6 +10,7 @@ const Register = () => {
         email: '',
         password: ''
     });
+    const { setUser } = useContext(UserContext);
 
     const handleChange = (e) => {
         const { name, value } = e.target;
@@ -20,6 +22,8 @@ const Register = () => {
         const response = axios.post('/user/register', formData)
             .then((res) => {
                 console.log('Registration successful:', res.data);
+                localStorage.setItem('token', res.data.token);
+                setUser(res.data.user);
                 navigate('/');
             }).catch((error) => {
                 console.error('Registration failed:', error.response?.data || error.message);
