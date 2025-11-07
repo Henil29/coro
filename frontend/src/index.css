@@ -1,5 +1,55 @@
 @import "tailwindcss";
 
-*{
+* {
     box-sizing: border-box;
+}
+
+:root {
+    /* Default Theme (VS Code Dark+) */
+    --color-primary: #1E1E1E;
+    --color-secondary: #252526;
+    --color-tertiary: #2D2D2D;
+    --color-light: #D4D4D4;
+    --color-muted: #9B9B9B;
+    --color-accent: #C2B36E;
+    --color-accent-hover: #D6C87B;
+    --color-border: #3C3C3C;
+}
+
+/* 🧩 VS Code Monokai Theme */
+[data-theme="monokai"] {
+    --color-primary: #272822;
+    --color-secondary: #3E3D32;
+    --color-tertiary: #49483E;
+    --color-light: #F8F8F2;
+    --color-muted: #A6E22E;
+    --color-accent: #FD971F;
+    --color-accent-hover: #FFB54C;
+    --color-border: #75715E;
+}
+
+/* 🧩 VS Code Light+ Theme */
+[data-theme="light"] {
+    --color-primary: #FFFFFF;
+    --color-secondary: #F3F3F3;
+    --color-tertiary: #EAEAEA;
+    --color-light: #1E1E1E;
+    --color-muted: #333333;
+    --color-accent: #007ACC;
+    --color-accent-hover: #3794FF;
+    --color-border: #CCCCCC;
+}
+
+@keyframes fadeIn {
+  from {
+    opacity: 0;
+    transform: translateY(-4px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+.animate-fadeIn {
+  animation: fadeIn 0.2s ease-in-out;
 }
