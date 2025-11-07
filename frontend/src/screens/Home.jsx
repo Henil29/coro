@@ -5,14 +5,16 @@ import Navbar from '../components/Navbar';
 
 const Home = () => {
     const [projects, setProjects] = useState([]);
-    const [user, setUser]= useState(null);
+    const [user, setUser] = useState(null);
 
-    const fetchProjects = () => {
-        axios.get('/project/all')
-            .then((response) => setProjects(response.data.projects))
+    const fetchProjects = async () => {
+        await axios.get('/project/all')
+            .then((response) =>{ setProjects(response.data.projects)
+                console.log(response.data.projects);
+            })
             .catch((error) => console.error('Error fetching projects!', error));
     };
-    const fetchUserName=()=>{
+    const fetchUserName = async () => {
         axios.get('/user/')
             .then((response) => {
                 setUser(response.data.user.name);
@@ -39,10 +41,11 @@ const Home = () => {
                     {projects.map((project) => (
                         <div
                             key={project._id}
-                            className="bg-(--color-secondary) border border-(--color-accent) p-5 rounded-xl shadow-md hover:shadow-[0_0_10px_var(--color-accent)] cursor-pointer transition-all group"
+                            className="bg-(--color-secondary) border border-(--color-accent) p-5 rounded-xl shadow-md hover:shadow-[0_0_3px_var(--color-accent)] cursor-pointer transition-all group"
                         >
-                            <h3 className="text-lg font-semibold mb-2 group-hover:text-(--color-light) underline-offset-4 hover:underline">
+                            <h3 className="text-lg flex items-center justify-between w-full font-semibold mb-2">
                                 {project.name}
+                                <p className="text-sm mt-2 opacity-70"><i className="ri-user-line text-(--color-light)"></i> {project.users.length}</p>
                             </h3>
                             <p className="text-sm opacity-80">Collaborate with your team in real time.</p>
                         </div>

@@ -17,9 +17,9 @@ const Register = () => {
         setFormData({ ...formData, [name]: value });
     };
 
-    const handleSubmit = (e) => {
+    const handleSubmit = async(e) => {
         e.preventDefault();
-        const response = axios.post('/user/register', formData)
+        const response =await axios.post('/user/register', formData)
             .then((res) => {
                 console.log('Registration successful:', res.data);
                 localStorage.setItem('token', res.data.token);

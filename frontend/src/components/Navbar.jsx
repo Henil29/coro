@@ -6,7 +6,9 @@ const Navbar = ({ username = "Unknown", onProjectCreated }) => {
     const [isOpen, setIsOpen] = useState(false);
     const [isModalOpen, setIsModalOpen] = useState(false);
     const [isMenuOpen, setIsMenuOpen] = useState(false);
+    const [isUserDropdownOpen, setIsUserDropdownOpen] = useState(false);
     const dropdownRef = useRef();
+    const userDropdownRef = useRef();
 
     useEffect(() => {
         document.documentElement.setAttribute("data-theme", theme);
@@ -17,6 +19,9 @@ const Navbar = ({ username = "Unknown", onProjectCreated }) => {
         const handleClickOutside = (event) => {
             if (dropdownRef.current && !dropdownRef.current.contains(event.target)) {
                 setIsOpen(false);
+            }
+            if (userDropdownRef.current && !userDropdownRef.current.contains(event.target)) {
+                setIsUserDropdownOpen(false);
             }
         };
         document.addEventListener("mousedown", handleClickOutside);
@@ -29,6 +34,16 @@ const Navbar = ({ username = "Unknown", onProjectCreated }) => {
         { id: "light", label: "Light+" },
     ];
 
+    const logout = async() => {
+        await axios
+            .get("/user/logout")
+            .then(() => {
+                console.log("User logged out successfully");
+            })
+            .catch((error) => {
+                console.error("Error during logout:", error.response?.data || error.message);
+            });
+    };
     const createProject = (e) => {
         e.preventDefault();
         axios
@@ -99,10 +114,36 @@ const Navbar = ({ username = "Unknown", onProjectCreated }) => {
                         <i className="ri-add-line text-lg"></i> New Project
                     </button>
 
-                    {/* User */}
-                    <div className="flex items-center gap-2 bg-(--color-tertiary) px-3 py-2 rounded-lg border border-(--color-border)">
-                        <i className="ri-user-line text-(--color-accent)"></i>
-                        <span className="text-sm font-medium">{username}</span>
+                    {/* User Dropdown */}
+                    <div className="relative" ref={userDropdownRef}>
+                        <button
+                            onClick={() => setIsUserDropdownOpen(!isUserDropdownOpen)}
+                            className="flex items-center gap-2 bg-(--color-tertiary) px-3 py-2 rounded-lg border border-(--color-border)"
+                        >
+                            <i className="ri-user-line text-(--color-accent)"></i>
+                            <span className="text-sm font-medium truncate">{username}</span>
+                            <i
+                                className={`ri-arrow-down-s-line transition-transform duration-200 ${isUserDropdownOpen ? "rotate-180" : ""
+                                    }`}
+                            ></i>
+                        </button>
+
+                        {isUserDropdownOpen && (
+                            <div className="absolute right-0 mt-2 w-44 bg-(--color-tertiary) border border-(--color-border) rounded-lg shadow-xl overflow-hidden animate-fadeIn z-50">
+                                <button
+                                    className="w-full text-left px-4 py-2 text-sm hover:bg-(--color-border) transition-all"
+                                    onClick={() => console.log("Profile clicked")}
+                                >
+                                    Profile
+                                </button>
+                                <button
+                                    className="w-full text-left px-4 py-2 text-sm hover:bg-(--color-border) transition-all"
+                                    onClick={logout}
+                                >
+                                    Logout
+                                </button>
+                            </div>
+                        )}
                     </div>
                 </div>
 
@@ -157,18 +198,49 @@ const Navbar = ({ username = "Unknown", onProjectCreated }) => {
                         )}
                     </div>
 
-                    {/* New Project Button */}
-                    <button
-                        onClick={() => setIsModalOpen(true)}
-                        className="flex items-center justify-center gap-2 w-full px-5 py-2 bg-(--color-accent) text-(--color-primary) hover:opacity-90 transition-all rounded-xl text-sm font-semibold shadow-lg"
-                    >
-                        <i className="ri-add-line text-lg"></i> New Project
-                    </button>
+                    {/* New Project and User Info in Single Row */}
+                    <div className="flex gap-3">
+                        {/* New Project Button */}
+                        <button
+                            onClick={() => setIsModalOpen(true)}
+                            className="flex items-center justify-center gap-2 w-full px-5 py-2 bg-(--color-accent) text-(--color-primary) hover:opacity-90 transition-all rounded-xl text-sm font-semibold shadow-lg"
+                        >
+                            <i className="ri-add-line text-lg"></i> New Project
+                        </button>
 
-                    {/* User Info */}
-                    <div className="flex items-center justify-center gap-2 bg-(--color-tertiary) px-3 py-2 rounded-lg border border-(--color-border)">
-                        <i className="ri-user-line text-(--color-accent)"></i>
-                        <span className="text-sm font-medium">{username}</span>
+                        {/* User Info */}
+                        <div className="relative" ref={userDropdownRef}>
+                            <button
+                                onClick={() => setIsUserDropdownOpen(!isUserDropdownOpen)}
+                                className="flex items-center justify-between w-full gap-2 bg-(--color-tertiary) px-3 py-2 rounded-lg border border-(--color-border)"
+                            >
+                                <div className="flex items-center gap-2">
+                                    <i className="ri-user-line text-(--color-accent)"></i>
+                                    <span className="text-sm font-medium truncate">{username}</span>
+                                </div>
+                                <i
+                                    className={`ri-arrow-down-s-line transition-transform duration-200 ${isUserDropdownOpen ? "rotate-180" : ""
+                                        }`}
+                                ></i>
+                            </button>
+
+                            {isUserDropdownOpen && (
+                                <div className="absolute left-0 right-0 mt-2 bg-(--color-tertiary) border border-(--color-border) rounded-lg shadow-lg overflow-hidden z-50">
+                                    <button
+                                        className="w-full text-left px-4 py-2 text-sm hover:bg-(--color-border) transition-all"
+                                        onClick={() => console.log("Profile clicked")}
+                                    >
+                                        Profile
+                                    </button>
+                                    <button
+                                        className="w-full text-left px-4 py-2 text-sm hover:bg-(--color-border) transition-all"
+                                        onClick={logout}
+                                    >
+                                        Logout
+                                    </button>
+                                </div>
+                            )}
+                        </div>
                     </div>
                 </div>
             )}
