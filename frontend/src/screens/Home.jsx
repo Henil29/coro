@@ -1,4 +1,4 @@
-import React, { useContext, useState } from 'react'
+import React, { useContext, useState, useEffect } from 'react'
 import { UserContext } from '../context/user.context'
 import axios from '../config/axios'
 
@@ -19,6 +19,10 @@ const Home = () => {
         });
         setIsModalOpen(false);
     }
+
+    useEffect(() => {
+        
+    }, []);
     return (
         <main className='p-4'>
             <div className="projects">

@@ -126,3 +126,13 @@ export const getUser = async (req, res) => {
         res.status(500).json({ message: 'Server error', error: error.message });
     }
 };
+
+export const getAllUsers = async (req, res) => {
+    try {
+        const loggedInUserEmail = req.user.email;
+        const users = await User.find({ email: { $ne: loggedInUserEmail } }, '-password');
+        res.status(200).json({ users });
+    } catch (error) {
+        res.status(500).json({ message: 'Server error', error: error.message });
+    }
+};
