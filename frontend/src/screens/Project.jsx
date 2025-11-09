@@ -1,8 +1,9 @@
-import React, { useEffect, useRef, useState } from "react";
+import React, { useEffect, useRef, useState, useContext } from "react";
 import { useLocation } from "react-router-dom";
 import axios from "../config/axios";
 import { useNavigate } from 'react-router-dom';
 import { initializeSocket, reciveMessage, sendMessage } from "../config/socket";
+import { UserContext } from "../context/user.context";
 
 const Project = () => {
     const navigate = useNavigate();
@@ -19,6 +20,8 @@ const Project = () => {
     const [searchQuery, setSearchQuery] = useState("");
     const [users, setUsers] = useState([]);
     const [usersInProject, setUsersinProject] = useState([]);
+    const [message, setMessage] = useState('');
+    const { user } = useContext(UserContext);
 
     const toggleUserSelection = (id) => {
         setSelectedUsers((prev) =>
@@ -41,11 +44,17 @@ const Project = () => {
         setSelectedUsers([]);
     };
 
-
     const filteredUsers = users.filter((user) =>
         user.name.toLowerCase().includes(searchQuery.toLowerCase())
     );
 
+    const sendMsg = () => {
+        sendMessage('project-message', {
+            message,
+            sender: user._id,
+        });
+        setMessage('');
+    }
     // --- Handle resizing ---
     const handleMouseDown = () => {
         isResizing.current = true;
@@ -65,19 +74,24 @@ const Project = () => {
 
     useEffect(() => {
 
-        initializeSocket();
+        initializeSocket(project._id);
+
+        reciveMessage('project-message', data => {
+            console.log('New message received:', data);
+        });
+
         axios.get('/user/all')
             .then((response) => {
                 setUsers(response.data.users);
             })
             .catch((error) => console.error('Error fetching users!', error));
 
-
         axios.get(`/project/get-project/${project._id}`)
             .then((response) => {
                 setUsersinProject(response.data.project.users);
             })
             .catch((error) => console.error('Error fetching users in Project!', error));
+
         window.addEventListener("mousemove", handleMouseMove);
         window.addEventListener("mouseup", handleMouseUp);
         return () => {
@@ -135,7 +149,7 @@ const Project = () => {
                                     "Sure! I’ve already updated the navbar. Pushing changes soon 🚀",
                                 time: "10:45 AM",
                                 isUser: true,
-                                img: "https://ui-avatars.com/api/?name=You&background=C2B36E&color=000",
+                                img: "https://ui-avatars.com/api/?name=U&background=C2B36E&color=000",
                             },
                         ].map((msg) => (
                             <div
@@ -174,16 +188,31 @@ const Project = () => {
                     </div>
 
                     {/* INPUT FIELD */}
-                    <div className="flex items-center border-t border-(--color-border) bg-(--color-tertiary) px-3 py-2">
-                        <input
-                            type="text"
-                            placeholder="Type a message..."
-                            className="grow bg-transparent outline-none text-(--color-light) placeholder-(--color-muted) px-2 py-1"
-                        />
-                        <button className="p-2 text-(--color-accent) hover:text-(--color-accent-hover) transition-all cursor-pointer">
-                            <i className="ri-send-plane-2-fill text-lg"></i>
-                        </button>
+                    <div className="border-t border-(--color-border) bg-(--color-tertiary) px-3 py-2">
+                        <form
+                            onSubmit={(e) => {
+                                e.preventDefault();
+                                if (message.trim()) sendMsg();
+                            }}
+                            className="flex items-center"
+                        >
+                            <input
+                                value={message}
+                                onChange={(e) => setMessage(e.target.value)}
+                                type="text"
+                                placeholder="Type a message..."
+                                className="grow bg-transparent outline-none text-(--color-light) placeholder-(--color-muted) px-2 py-1"
+                            />
+
+                            <button
+                                type="submit"
+                                className="p-2 text-(--color-accent) hover:text-(--color-accent-hover) transition-all cursor-pointer"
+                            >
+                                <i className="ri-send-plane-2-fill text-lg"></i>
+                            </button>
+                        </form>
                     </div>
+
                 </div>
 
                 {/* MEMBERS PANEL (Slides in from left) */}

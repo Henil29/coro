@@ -22,7 +22,6 @@ const Login = () => {
         await axios
             .post('/user/login', formData)
             .then((res) => {
-                console.log('Login successful:', res.data);
                 localStorage.setItem('token', res.data.token);
                 setUser(res.data.user);
                 navigate('/');
@@ -33,7 +32,7 @@ const Login = () => {
     };
 
     return (
-        <div className="flex items-center justify-center min-h-screen bg-(--color-primary) text-(--color-light) transition-all duration-300">
+        <div className="min-h-screen flex items-center justify-center bg-(--color-primary) text-(--color-light) transition-all duration-300">
             <div className="w-full max-w-md p-8 space-y-6 bg-(--color-secondary) border border-(--color-border) rounded-2xl shadow-lg shadow-(--color-accent)/10">
                 <h2 className="text-2xl font-bold text-center mb-2">Welcome Back</h2>
                 <p className="text-sm text-center opacity-70 mb-6">

@@ -1,41 +1,32 @@
-import React, { useContext, useState, useEffect } from 'react';
-import { UserContext } from '../context/user.context';
+import React, { useState, useEffect } from 'react';
 import axios from '../config/axios';
-import Navbar from '../components/Navbar';
 import { useNavigate } from 'react-router-dom';
 
 const Home = () => {
     const [projects, setProjects] = useState([]);
-    const [user, setUser] = useState(null);
     const navigate = useNavigate();
-    const fetchProjects = async () => {
-        await axios.get('/project/all')
-            .then((response) => {
-                setProjects(response.data.projects)
-            })
-            .catch((error) => console.error('Error fetching projects!', error));
-    };
-    const fetchUserName = async () => {
-        axios.get('/user/')
-            .then((response) => {
-                setUser(response.data.user.name);
-            })
-            .catch((error) => console.error('Error fetching user data!', error));
-    }
-
-    const fetchData = async () => {
-        await fetchProjects();
-        await fetchUserName();
-    };
 
     useEffect(() => {
+        const fetchData = async () => {
+            try {
+                const token = localStorage.getItem('token');
+                if (!token) return;
+
+                const projectsResponse = await axios.get('/project/all', {
+                    headers: { Authorization: `Bearer ${token}` },
+                });
+                setProjects(projectsResponse.data.projects);
+            } catch (error) {
+                console.error('Error fetching data!', error);
+            }
+        };
+
         fetchData();
     }, []);
 
     return (
         <>
-            <Navbar onProjectCreated={fetchProjects} username={user} />
-            <main className="min-h-screen bg-(--color-primary) text-(--color-light) p-8 transition-all duration-300">
+            <main className="min-h-[calc(100vh-4rem)] bg-(--color-primary) text-(--color-light) p-8 transition-all duration-300 mt-16">
                 {/* HEADER */}
                 <header className="mb-8 flex justify-between items-center">
                     <h1 className="text-3xl font-bold tracking-tight">Your Projects</h1>

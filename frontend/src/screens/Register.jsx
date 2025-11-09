@@ -33,7 +33,7 @@ const Register = () => {
     };
 
     return (
-        <div className="flex items-center justify-center min-h-screen bg-(--color-primary) text-(--color-light) transition-all duration-300">
+        <div className="min-h-screen flex items-center justify-center bg-(--color-primary)">
             <div className="w-full max-w-md p-8 space-y-6 bg-(--color-secondary) border border-(--color-border) rounded-2xl shadow-lg shadow-(--color-accent)/10">
                 <h2 className="text-2xl font-bold text-center mb-2">
                     Create Your Account
