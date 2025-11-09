@@ -2,15 +2,16 @@ import React, { useContext, useState, useEffect } from 'react';
 import { UserContext } from '../context/user.context';
 import axios from '../config/axios';
 import Navbar from '../components/Navbar';
+import { useNavigate } from 'react-router-dom';
 
 const Home = () => {
     const [projects, setProjects] = useState([]);
     const [user, setUser] = useState(null);
-
+    const navigate = useNavigate();
     const fetchProjects = async () => {
         await axios.get('/project/all')
-            .then((response) =>{ setProjects(response.data.projects)
-                console.log(response.data.projects);
+            .then((response) => {
+                setProjects(response.data.projects)
             })
             .catch((error) => console.error('Error fetching projects!', error));
     };
@@ -22,9 +23,13 @@ const Home = () => {
             .catch((error) => console.error('Error fetching user data!', error));
     }
 
+    const fetchData = async () => {
+        await fetchProjects();
+        await fetchUserName();
+    };
+
     useEffect(() => {
-        fetchProjects();
-        fetchUserName();
+        fetchData();
     }, []);
 
     return (
@@ -40,6 +45,9 @@ const Home = () => {
                 <section className="grid sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-6">
                     {projects.map((project) => (
                         <div
+                            onClick={() => navigate(`/project/${project.name}`, {
+                                state: { project }
+                            })}
                             key={project._id}
                             className="bg-(--color-secondary) border border-(--color-accent) p-5 rounded-xl shadow-md hover:shadow-[0_0_3px_var(--color-accent)] cursor-pointer transition-all group"
                         >

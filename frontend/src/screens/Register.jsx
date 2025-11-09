@@ -1,14 +1,14 @@
 import React, { useContext, useState } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
-import axios from '../config/axios.js'
-import { UserContext } from '../context/user.context'
+import axios from '../config/axios.js';
+import { UserContext } from '../context/user.context';
 
 const Register = () => {
     const navigate = useNavigate();
     const [formData, setFormData] = useState({
         name: '',
         email: '',
-        password: ''
+        password: '',
     });
     const { setUser } = useContext(UserContext);
 
@@ -17,70 +17,91 @@ const Register = () => {
         setFormData({ ...formData, [name]: value });
     };
 
-    const handleSubmit = async(e) => {
+    const handleSubmit = async (e) => {
         e.preventDefault();
-        const response =await axios.post('/user/register', formData)
+        await axios
+            .post('/user/register', formData)
             .then((res) => {
                 console.log('Registration successful:', res.data);
                 localStorage.setItem('token', res.data.token);
                 setUser(res.data.user);
                 navigate('/');
-            }).catch((error) => {
+            })
+            .catch((error) => {
                 console.error('Registration failed:', error.response?.data || error.message);
             });
     };
 
     return (
-        <div className="flex items-center justify-center min-h-screen bg-gray-900">
-            <div className="w-full max-w-md p-8 space-y-6 bg-gray-800 rounded-lg shadow-md">
-                <h2 className="text-2xl font-bold text-center text-white">Register</h2>
-                <form className="space-y-4" onSubmit={handleSubmit}>
+        <div className="flex items-center justify-center min-h-screen bg-(--color-primary) text-(--color-light) transition-all duration-300">
+            <div className="w-full max-w-md p-8 space-y-6 bg-(--color-secondary) border border-(--color-border) rounded-2xl shadow-lg shadow-(--color-accent)/10">
+                <h2 className="text-2xl font-bold text-center mb-2">
+                    Create Your Account
+                </h2>
+                <p className="text-sm text-center opacity-70 mb-6">
+                    Join <span className="text-(--color-accent) font-medium">Coro</span> and start collaborating.
+                </p>
+
+                <form className="space-y-5" onSubmit={handleSubmit}>
                     <div>
-                        <label htmlFor="name" className="block text-sm font-medium text-gray-300">Name</label>
+                        <label htmlFor="name" className="block text-sm font-medium opacity-80 mb-1">
+                            Name
+                        </label>
                         <input
                             type="text"
                             id="name"
                             name="name"
                             value={formData.name}
                             onChange={handleChange}
-                            className="w-full px-4 py-2 mt-1 text-gray-900 bg-gray-200 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
                             placeholder="Enter your name"
+                            className="w-full px-4 py-2 bg-(--color-primary) border border-(--color-border) rounded-md focus:outline-none focus:ring-2 focus:ring-(--color-accent) text-(--color-light) placeholder-(--color-muted)"
                         />
                     </div>
+
                     <div>
-                        <label htmlFor="email" className="block text-sm font-medium text-gray-300">Email</label>
+                        <label htmlFor="email" className="block text-sm font-medium opacity-80 mb-1">
+                            Email
+                        </label>
                         <input
                             type="email"
                             id="email"
                             name="email"
                             value={formData.email}
                             onChange={handleChange}
-                            className="w-full px-4 py-2 mt-1 text-gray-900 bg-gray-200 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
                             placeholder="Enter your email"
+                            className="w-full px-4 py-2 bg-(--color-primary) border border-(--color-border) rounded-md focus:outline-none focus:ring-2 focus:ring-(--color-accent) text-(--color-light) placeholder-(--color-muted)"
                         />
                     </div>
+
                     <div>
-                        <label htmlFor="password" className="block text-sm font-medium text-gray-300">Password</label>
+                        <label htmlFor="password" className="block text-sm font-medium opacity-80 mb-1">
+                            Password
+                        </label>
                         <input
                             type="password"
                             id="password"
                             name="password"
                             value={formData.password}
                             onChange={handleChange}
-                            className="w-full px-4 py-2 mt-1 text-gray-900 bg-gray-200 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
                             placeholder="Enter your password"
+                            className="w-full px-4 py-2 bg-(--color-primary) border border-(--color-border) rounded-md focus:outline-none focus:ring-2 focus:ring-(--color-accent) text-(--color-light) placeholder-(--color-muted)"
                         />
                     </div>
+
                     <button
                         type="submit"
-                        className="w-full px-4 py-2 text-white bg-blue-600 rounded-md hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-blue-500"
+                        className="w-full px-4 py-2 mt-2 bg-(--color-accent) text-(--color-primary) font-semibold rounded-md hover:bg-(--color-accent-hover) transition-all shadow-md"
                     >
                         Register
                     </button>
                 </form>
-                <p className="text-sm text-center text-gray-400">
+
+                <p className="text-sm text-center opacity-70">
                     Already have an account?{' '}
-                    <Link to="/login" className="text-blue-400 hover:underline">
+                    <Link
+                        to="/login"
+                        className="text-(--color-accent) hover:underline hover:opacity-90"
+                    >
                         Login
                     </Link>
                 </p>
