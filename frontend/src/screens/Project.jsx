@@ -1,4 +1,4 @@
-import React, { useEffect, useRef, useState, useContext } from "react";
+import React, { useCallback, useEffect, useRef, useState, useContext } from "react";
 import { useLocation } from "react-router-dom";
 import axios from "../config/axios";
 import { useNavigate } from 'react-router-dom';
@@ -21,7 +21,10 @@ const Project = () => {
     const [users, setUsers] = useState([]);
     const [usersInProject, setUsersinProject] = useState([]);
     const [message, setMessage] = useState('');
+    const [messages, setMessages] = useState([]);
     const { user } = useContext(UserContext);
+    const messageBox = useRef(null);
+    const seenMessageIdsRef = useRef(new Set());
 
     const toggleUserSelection = (id) => {
         setSelectedUsers((prev) =>
@@ -48,10 +51,114 @@ const Project = () => {
         user.name.toLowerCase().includes(searchQuery.toLowerCase())
     );
 
+    const appendIncomingMessage = useCallback((incomingMessage) => {
+        if (!incomingMessage) return;
+
+        const rawId = incomingMessage._id || incomingMessage.id;
+        const trimmedText = (incomingMessage.message || "").trim();
+        const tempId = incomingMessage.tempId;
+
+        const senderData = typeof incomingMessage.sender === "object" && incomingMessage.sender !== null
+            ? incomingMessage.sender
+            : { _id: incomingMessage.sender };
+
+        const preparedMessage = {
+            id: rawId || tempId || `remote-${Date.now()}`,
+            tempId: tempId,
+            text: trimmedText,
+            senderId: senderData?._id,
+            senderName: senderData?.name || incomingMessage.senderName || "",
+            createdAt: incomingMessage.createdAt || new Date().toISOString(),
+            status: "delivered",
+        };
+
+        setMessages((prev) => {
+            if (rawId && seenMessageIdsRef.current.has(rawId)) {
+                return prev;
+            }
+
+            const updatedMessages = [...prev];
+
+            if (tempId) {
+                const pendingIndex = updatedMessages.findIndex((msg) => msg.tempId === tempId);
+                if (pendingIndex !== -1) {
+                    updatedMessages[pendingIndex] = {
+                        ...updatedMessages[pendingIndex],
+                        ...preparedMessage,
+                    };
+                    if (rawId) {
+                        seenMessageIdsRef.current.add(rawId);
+                    }
+                    return updatedMessages;
+                }
+            }
+
+            if (senderData?._id && senderData._id === user?._id) {
+                const fallbackIndex = updatedMessages.findIndex(
+                    (msg) => msg.status === "pending" && msg.senderId === senderData._id && msg.text === trimmedText
+                );
+                if (fallbackIndex !== -1) {
+                    updatedMessages[fallbackIndex] = {
+                        ...updatedMessages[fallbackIndex],
+                        ...preparedMessage,
+                    };
+                    if (rawId) {
+                        seenMessageIdsRef.current.add(rawId);
+                    }
+                    return updatedMessages;
+                }
+            }
+
+            if (rawId) {
+                seenMessageIdsRef.current.add(rawId);
+            }
+
+            return [...updatedMessages, preparedMessage];
+        });
+
+        if (typeof window !== "undefined" && window.requestAnimationFrame) {
+            window.requestAnimationFrame(() => {
+                if (messageBox.current) {
+                    messageBox.current.scrollTop = messageBox.current.scrollHeight;
+                }
+            });
+        } else if (messageBox.current) {
+            messageBox.current.scrollTop = messageBox.current.scrollHeight;
+        }
+    }, [user?._id]);
+
     const sendMsg = () => {
+        if (!user?._id || !message.trim()) return;
+
+        const trimmed = message.trim();
+        const tempId = `local-${Date.now()}`;
+
+        const localMessage = {
+            id: tempId,
+            tempId,
+            text: trimmed,
+            senderId: user._id,
+            senderName: user.name,
+            createdAt: new Date().toISOString(),
+            status: "pending",
+        };
+
+        setMessages((prev) => [...prev, localMessage]);
+
+        if (typeof window !== "undefined" && window.requestAnimationFrame) {
+            window.requestAnimationFrame(() => {
+                if (messageBox.current) {
+                    messageBox.current.scrollTop = messageBox.current.scrollHeight;
+                }
+            });
+        } else if (messageBox.current) {
+            messageBox.current.scrollTop = messageBox.current.scrollHeight;
+        }
+
         sendMessage('project-message', {
-            message,
+            message: trimmed,
             sender: user._id,
+            tempId,
         });
         setMessage('');
     }
@@ -73,12 +180,16 @@ const Project = () => {
     };
 
     useEffect(() => {
+        if (!project?._id) return;
 
         initializeSocket(project._id);
 
-        reciveMessage('project-message', data => {
+        const messageHandler = (data) => {
             console.log('New message received:', data);
-        });
+            appendIncomingMessage(data);
+        };
+
+        reciveMessage('project-message', messageHandler);
 
         axios.get('/user/all')
             .then((response) => {
@@ -98,12 +209,11 @@ const Project = () => {
             window.removeEventListener("mousemove", handleMouseMove);
             window.removeEventListener("mouseup", handleMouseUp);
         };
-    }, []);
+    }, [appendIncomingMessage, project?._id]);
 
     useEffect(() => {
         localStorage.setItem("panelWidth", panelWidth);
     }, [panelWidth]);
-
     return (
         <main className="h-screen w-screen bg-(--color-primary) text-(--color-light) flex overflow-hidden">
             {/* LEFT PANEL */}
@@ -129,62 +239,66 @@ const Project = () => {
                 </header>
 
                 {/* CHAT AREA + INPUT FIELD (Static) */}
-                <div className="absolute top-12 inset-x-0 bottom-0 flex flex-col">
+                <div className="absolute top-13 inset-x-0 bottom-0 flex flex-col">
                     {/* CHAT MESSAGES */}
-                    <div className="flex flex-col grow overflow-y-auto p-4 space-y-4">
-                        {[
-                            {
-                                id: 1,
-                                name: "Henil Patel",
-                                message:
-                                    "Hey team 👋, let's start working on the new UI section today.",
-                                time: "10:42 AM",
-                                isUser: false,
-                                img: "https://ui-avatars.com/api/?name=Henil+Patel&background=444&color=fff",
-                            },
-                            {
-                                id: 2,
-                                name: "You",
-                                message:
-                                    "Sure! I’ve already updated the navbar. Pushing changes soon 🚀",
-                                time: "10:45 AM",
-                                isUser: true,
-                                img: "https://ui-avatars.com/api/?name=U&background=C2B36E&color=000",
-                            },
-                        ].map((msg) => (
-                            <div
-                                key={msg.id}
-                                className={`flex items-start gap-3 ${msg.isUser ? "flex-row-reverse ml-10" : ""
-                                    }`}
-                            >
-                                <img
-                                    src={msg.img}
-                                    alt={msg.name}
-                                    className="w-9 h-9 rounded-full border border-(--color-border) object-cover"
-                                />
-                                <div className="flex flex-col max-w-[80%]">
+                    <div
+                        ref={messageBox}
+                        className="flex flex-col grow overflow-y-auto scrollbar-hide p-4 space-y-4 message-box"
+                    >
+                        {messages.length === 0 ? (
+                            <p className="text-(--color-muted) text-sm text-center mt-6">
+                                No messages yet. Start the conversation!
+                            </p>
+                        ) : (
+                            messages.map((msg) => {
+                                const isUserMessage = msg.senderId && user?._id === msg.senderId;
+                                const lookupUser = usersInProject.find((member) => member._id === msg.senderId)
+                                    || users.find((member) => member._id === msg.senderId);
+                                const displayName = isUserMessage
+                                    ? "You"
+                                    : lookupUser?.name || msg.senderName || "Team Member";
+                                const avatarSeed = lookupUser?.name || msg.senderName || displayName;
+                                const timestamp = msg.createdAt
+                                    ? new Date(msg.createdAt).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" })
+                                    : "";
+
+                                return (
                                     <div
-                                        className={`text-xs font-medium mb-1 ${msg.isUser
-                                            ? "text-(--color-accent)"
-                                            : "text-(--color-muted)"
-                                            }`}
+                                        key={msg.id}
+                                        className={`flex items-start gap-3 ${isUserMessage ? "flex-row-reverse ml-10" : ""}`}
                                     >
-                                        {msg.name}
+                                        <img
+                                            src={`https://ui-avatars.com/api/?name=${encodeURIComponent(avatarSeed || "Member")}&background=${isUserMessage ? "C2B36E" : "444"}&color=${isUserMessage ? "000" : "fff"}`}
+                                            alt={displayName}
+                                            className="w-9 h-9 rounded-full border border-(--color-border) object-cover"
+                                        />
+                                        <div className="flex flex-col max-w-[80%]">
+                                            <div
+                                                className={`text-xs font-medium mb-1 ${isUserMessage
+                                                    ? "text-(--color-accent)"
+                                                    : "text-(--color-muted)"
+                                                    }`}
+                                            >
+                                                {displayName}
+                                            </div>
+                                            <div
+                                                className={`rounded-xl px-4 py-2 text-sm leading-relaxed ${isUserMessage
+                                                    ? "bg-(--color-accent) text-(--color-primary)"
+                                                    : "bg-(--color-tertiary) text-(--color-light)"
+                                                    }`}
+                                            >
+                                                {msg.text}
+                                            </div>
+                                            {(timestamp || msg.status === "pending") && (
+                                                <span className="text-[11px] opacity-60 mt-1">
+                                                    {timestamp}
+                                                </span>
+                                            )}
+                                        </div>
                                     </div>
-                                    <div
-                                        className={`rounded-xl px-4 py-2 text-sm leading-relaxed ${msg.isUser
-                                            ? "bg-(--color-accent) text-(--color-primary)"
-                                            : "bg-(--color-tertiary) text-(--color-light)"
-                                            }`}
-                                    >
-                                        {msg.message}
-                                    </div>
-                                    <span className="text-[11px] opacity-60 mt-1">
-                                        {msg.time}
-                                    </span>
-                                </div>
-                            </div>
-                        ))}
+                                );
+                            })
+                        )}
                     </div>
 
                     {/* INPUT FIELD */}
