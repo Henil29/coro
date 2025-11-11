@@ -2,8 +2,10 @@ import React, { useCallback, useEffect, useRef, useState, useContext } from "rea
 import { useLocation } from "react-router-dom";
 import axios from "../config/axios";
 import { useNavigate } from 'react-router-dom';
-import { initializeSocket, reciveMessage, sendMessage } from "../config/socket";
+import { initializeSocket, reciveMessage as receiveMessage, sendMessage } from "../config/socket";
 import { UserContext } from "../context/user.context";
+import Markdown from 'markdown-to-jsx'
+import Editor from "@monaco-editor/react";
 
 const Project = () => {
     const navigate = useNavigate();
@@ -22,9 +24,57 @@ const Project = () => {
     const [usersInProject, setUsersinProject] = useState([]);
     const [message, setMessage] = useState('');
     const [messages, setMessages] = useState([]);
+    const [fileTree, setFileTree] = useState({});
+    const [currentFile, setCurrentFile] = useState(null);
+    const [openFiles, setOpenFiles] = useState([]);
     const { user } = useContext(UserContext);
     const messageBox = useRef(null);
-    const seenMessageIdsRef = useRef(new Set());
+    const currentFileContent = currentFile ? fileTree[currentFile]?.content ?? "" : "";
+
+    const resolveLanguage = useCallback((fileName) => {
+        if (!fileName) return "plaintext";
+        const extension = fileName.split(".").pop()?.toLowerCase();
+        switch (extension) {
+            case "js":
+            case "jsx":
+            case "ts":
+            case "tsx":
+                return "javascript";
+            case "json":
+                return "json";
+            case "html":
+            case "htm":
+                return "html";
+            case "css":
+                return "css";
+            case "md":
+            case "markdown":
+                return "markdown";
+            case "py":
+                return "python";
+            case "java":
+                return "java";
+            case "c":
+            case "h":
+                return "c";
+            case "cpp":
+            case "hpp":
+                return "cpp";
+            case "sh":
+            case "bash":
+                return "bash";
+            case "sql":
+                return "sql";
+            default:
+                return "plaintext";
+        }
+    }, []);
+
+    const formatCodeForMarkdown = useCallback((code, fileName) => {
+        const language = resolveLanguage(fileName);
+        const safeCode = (code ?? "").replace(/```/g, "```\u200b");
+        return `\`\`\`${language}\n${safeCode}\n\`\`\``;
+    }, [resolveLanguage]);
 
     const toggleUserSelection = (id) => {
         setSelectedUsers((prev) =>
@@ -51,70 +101,98 @@ const Project = () => {
         user.name.toLowerCase().includes(searchQuery.toLowerCase())
     );
 
-    const appendIncomingMessage = useCallback((incomingMessage) => {
-        if (!incomingMessage) return;
+    const normalizeFileTree = useCallback((tree) => {
+        if (!tree || typeof tree !== "object") {
+            return null;
+        }
 
-        const rawId = incomingMessage._id || incomingMessage.id;
-        const trimmedText = (incomingMessage.message || "").trim();
-        const tempId = incomingMessage.tempId;
+        const normalized = {};
+
+        Object.entries(tree).forEach(([path, value]) => {
+            if (!path) {
+                return;
+            }
+
+            let content;
+
+            if (typeof value === "string") {
+                content = value;
+            } else if (value && typeof value === "object") {
+                if (typeof value.content === "string") {
+                    content = value.content;
+                } else if (typeof value.contents === "string") {
+                    content = value.contents;
+                } else if (value.file && typeof value.file.contents === "string") {
+                    content = value.file.contents;
+                } else if (typeof value.code === "string") {
+                    content = value.code;
+                }
+            }
+
+            if (content !== undefined) {
+                normalized[path] = { content };
+            }
+        });
+
+        return Object.keys(normalized).length ? normalized : null;
+    }, []);
+
+    const handleIncomingMessage = useCallback((incomingMessage) => {
+        if (!incomingMessage) return;
 
         const senderData = typeof incomingMessage.sender === "object" && incomingMessage.sender !== null
             ? incomingMessage.sender
             : { _id: incomingMessage.sender };
 
+        const isAIMessage = senderData?._id === "ai";
+
+        let textPayload = incomingMessage.message;
+        let aiFileTree = null;
+
+        if (isAIMessage && typeof incomingMessage.message === "string") {
+            try {
+                const parsed = JSON.parse(incomingMessage.message);
+                if (parsed && typeof parsed === "object") {
+                    if (typeof parsed.text === "string") {
+                        textPayload = parsed.text;
+                    }
+                    if (parsed.fileTree && typeof parsed.fileTree === "object") {
+                        aiFileTree = parsed.fileTree;
+                    }
+                }
+            } catch {
+                /* keep raw message text */
+            }
+        }
+
+        if (isAIMessage && !aiFileTree && incomingMessage.fileTree && typeof incomingMessage.fileTree === "object") {
+            aiFileTree = incomingMessage.fileTree;
+        }
+
         const preparedMessage = {
-            id: rawId || tempId || `remote-${Date.now()}`,
-            tempId: tempId,
-            text: trimmedText,
+            id: incomingMessage._id || incomingMessage.id || `remote-${Date.now()}`,
+            text: typeof textPayload === "string" ? textPayload : "",
             senderId: senderData?._id,
             senderName: senderData?.name || incomingMessage.senderName || "",
             createdAt: incomingMessage.createdAt || new Date().toISOString(),
-            status: "delivered",
+            renderAsMarkdown: isAIMessage,
         };
 
-        setMessages((prev) => {
-            if (rawId && seenMessageIdsRef.current.has(rawId)) {
-                return prev;
-            }
+        setMessages((prev) => [...prev, preparedMessage]);
 
-            const updatedMessages = [...prev];
-
-            if (tempId) {
-                const pendingIndex = updatedMessages.findIndex((msg) => msg.tempId === tempId);
-                if (pendingIndex !== -1) {
-                    updatedMessages[pendingIndex] = {
-                        ...updatedMessages[pendingIndex],
-                        ...preparedMessage,
-                    };
-                    if (rawId) {
-                        seenMessageIdsRef.current.add(rawId);
+        if (isAIMessage && aiFileTree) {
+            const normalizedTree = normalizeFileTree(aiFileTree);
+            if (normalizedTree) {
+                setFileTree(normalizedTree);
+                setCurrentFile((prev) => {
+                    if (prev && normalizedTree[prev]) {
+                        return prev;
                     }
-                    return updatedMessages;
-                }
+                    const [firstFile] = Object.keys(normalizedTree);
+                    return firstFile || prev;
+                });
             }
-
-            if (senderData?._id && senderData._id === user?._id) {
-                const fallbackIndex = updatedMessages.findIndex(
-                    (msg) => msg.status === "pending" && msg.senderId === senderData._id && msg.text === trimmedText
-                );
-                if (fallbackIndex !== -1) {
-                    updatedMessages[fallbackIndex] = {
-                        ...updatedMessages[fallbackIndex],
-                        ...preparedMessage,
-                    };
-                    if (rawId) {
-                        seenMessageIdsRef.current.add(rawId);
-                    }
-                    return updatedMessages;
-                }
-            }
-
-            if (rawId) {
-                seenMessageIdsRef.current.add(rawId);
-            }
-
-            return [...updatedMessages, preparedMessage];
-        });
+        }
 
         if (typeof window !== "undefined" && window.requestAnimationFrame) {
             window.requestAnimationFrame(() => {
@@ -125,22 +203,19 @@ const Project = () => {
         } else if (messageBox.current) {
             messageBox.current.scrollTop = messageBox.current.scrollHeight;
         }
-    }, [user?._id]);
+    }, [messageBox, normalizeFileTree]);
 
     const sendMsg = () => {
-        if (!user?._id || !message.trim()) return;
+        if (!user || !message.trim()) return;
 
         const trimmed = message.trim();
-        const tempId = `local-${Date.now()}`;
-
         const localMessage = {
-            id: tempId,
-            tempId,
+            id: `local-${Date.now()}`,
             text: trimmed,
             senderId: user._id,
             senderName: user.name,
             createdAt: new Date().toISOString(),
-            status: "pending",
+            renderAsMarkdown: false,
         };
 
         setMessages((prev) => [...prev, localMessage]);
@@ -157,9 +232,9 @@ const Project = () => {
 
         sendMessage('project-message', {
             message: trimmed,
-            sender: user._id,
-            tempId,
+            sender: user,
         });
+
         setMessage('');
     }
     // --- Handle resizing ---
@@ -185,11 +260,11 @@ const Project = () => {
         initializeSocket(project._id);
 
         const messageHandler = (data) => {
-            console.log('New message received:', data);
-            appendIncomingMessage(data);
+            handleIncomingMessage(data);
+            console.log(data);
         };
 
-        reciveMessage('project-message', messageHandler);
+        receiveMessage('project-message', messageHandler);
 
         axios.get('/user/all')
             .then((response) => {
@@ -209,11 +284,12 @@ const Project = () => {
             window.removeEventListener("mousemove", handleMouseMove);
             window.removeEventListener("mouseup", handleMouseUp);
         };
-    }, [appendIncomingMessage, project?._id]);
+    }, [handleIncomingMessage, project?._id]);
 
     useEffect(() => {
         localStorage.setItem("panelWidth", panelWidth);
     }, [panelWidth]);
+
     return (
         <main className="h-screen w-screen bg-(--color-primary) text-(--color-light) flex overflow-hidden">
             {/* LEFT PANEL */}
@@ -282,14 +358,22 @@ const Project = () => {
                                                 {displayName}
                                             </div>
                                             <div
-                                                className={`rounded-xl px-4 py-2 text-sm leading-relaxed ${isUserMessage
+                                                className={`rounded-xl px-4 py-2 text-sm leading-relaxed whitespace-pre-wrap wrap-break-word select-text ${isUserMessage
                                                     ? "bg-(--color-accent) text-(--color-primary)"
-                                                    : "bg-(--color-tertiary) text-(--color-light)"
+                                                    : msg.renderAsMarkdown
+                                                        ? "bg-[rgba(11,21,40,0.85)] border border-(--color-border) text-(--color-light)"
+                                                        : "bg-(--color-tertiary) text-(--color-light)"
                                                     }`}
                                             >
-                                                {msg.text}
+                                                {msg.renderAsMarkdown ? (
+                                                    <div className="overflow-auto ai-message">
+                                                        <Markdown options={{ forceBlock: true }}>{msg.text}</Markdown>
+                                                    </div>
+                                                ) : (
+                                                    msg.text
+                                                )}
                                             </div>
-                                            {(timestamp || msg.status === "pending") && (
+                                            {timestamp && (
                                                 <span className="text-[11px] opacity-60 mt-1">
                                                     {timestamp}
                                                 </span>
@@ -497,7 +581,75 @@ const Project = () => {
             />
 
             {/* RIGHT SIDE */}
-            <section className="grow bg-(--color-primary)"></section>
+            <section className="grow bg-(--color-primary) flex">
+                <div className="explorer h-full min-w-64 bg-(--color-secondary) border-r border-(--color-border) w-64">
+                    <div className="file-tree p-2">
+                        {
+                            Object.keys(fileTree).map((fileName) => (
+                                <div
+                                    key={fileName}
+                                    onClick={() => {
+                                        setCurrentFile(fileName)
+                                        setOpenFiles([...new Set([...openFiles, fileName])]);
+                                    }}
+                                    className="p-2 border-b border-(--color-border) hover:bg-(--color-tertiary) cursor-pointer">
+                                    {fileName}
+                                </div>
+                            ))
+                        }
+                    </div>
+                </div>
+                <div className="code-editor w-full h-full">
+                    {currentFile ? (
+                        <div className="h-full w-full flex flex-col grow">
+                            <div className="top">
+                                {
+                                    openFiles.map((fileName) => (
+                                        <button
+                                            key={fileName}
+                                            onClick={() => setCurrentFile(fileName)}
+                                            className={`px-4 py-2 border-b-2 ${currentFile === fileName ? "border-(--color-accent) bg-(--color-tertiary)" : "border-transparent hover:bg-(--color-tertiary)"} `}
+                                        >
+                                            {fileName}
+                                        </button>
+                                    ))
+                                }
+                            </div>
+                            <div className="bottom h-full w-full overflow-auto">
+                                {fileTree[currentFile] && (
+                                    <div className="p-4">
+                                        <Editor
+                                            height="calc(100vh - 120px)" // adjusts height dynamically
+                                            language={resolveLanguage(currentFile)}
+                                            value={currentFileContent}
+                                            theme="vs-dark"
+                                            onChange={(value) => {
+                                                // Update code content live inside fileTree state
+                                                setFileTree((prev) => ({
+                                                    ...prev,
+                                                    [currentFile]: { ...prev[currentFile], content: value },
+                                                }));
+                                            }}
+                                            options={{
+                                                fontSize: 15,
+                                                minimap: { enabled: false },
+                                                scrollBeyondLastLine: false,
+                                                wordWrap: "on",
+                                                automaticLayout: true,
+                                            }}
+                                        />
+
+                                    </div>
+                                )}
+                            </div>
+                        </div>
+                    ) : (
+                        <div className="flex items-center justify-center h-full w-full text-(--color-muted)">
+                            Select a file to view its contents
+                        </div>
+                    )}
+                </div>
+            </section>
         </main>
     );
 };

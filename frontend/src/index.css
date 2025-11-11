@@ -65,3 +65,47 @@
 .message-box::-webkit-scrollbar {
   display: none;
 }
+
+.ai-message {
+  overflow-x: auto;
+  scrollbar-width: thin;
+  scrollbar-color: var(--color-accent) var(--color-tertiary);
+  scrollbar-gutter: stable;
+}
+
+.bottom {
+  scrollbar-width: thin;
+  scrollbar-color: var(--color-accent) var(--color-tertiary);
+  overflow: auto;
+  scrollbar-gutter: stable;
+}
+
+.bottomx::-webkit-scrollbar {
+  width: 4px;
+}
+
+.bottom::-webkit-scrollbar-track {
+  background: var(--color-tertiary);
+  border-radius: 9999px;
+}
+
+.bottom::-webkit-scrollbar-thumb {
+  background: var(--color-accent);
+  border-radius: 9999px;
+  border: 2px solid var(--color-tertiary);
+}
+
+.bottom::-webkit-scrollbar-thumb:hover {
+  background: var(--color-accent-hover);
+}
+
+.bottom::-webkit-scrollbar-button {
+  display: none;
+  height: 0;
+  width: 0;
+}
+
+.hljs[contenteditable="true"] {
+  caret-color: #fff;
+  min-height: 200px;
+}

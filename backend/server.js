@@ -6,6 +6,7 @@ import { Server } from "socket.io";
 import jwt from 'jsonwebtoken';
 import mongoose from 'mongoose';
 import Project from './models/project.model.js';
+import { generateResult } from './services/ai.service.js';
 
 const server = http.createServer(app);
 const io = new Server(server, {
@@ -45,9 +46,24 @@ io.on('connection', socket => {
     console.log('New client connected:', socket.id);
     socket.join(socket.roomId);
 
-    socket.on('project-message', data => {
-        console.log('Received project-message:', data);
+    socket.on('project-message', async data => {
+        const isAIMessage = data.message.includes('@ai');
         socket.broadcast.to(socket.roomId).emit('project-message', data);
+        if (!isAIMessage) return;
+
+        const prompt = data.message.replace('@ai', '').trim();
+        try {
+            const result = await generateResult(prompt);
+            io.to(socket.roomId).emit('project-message', {
+                message: result,
+                sender: { _id: 'ai', name: 'AI Assistant', email: 'ai@ai.com' }
+            });
+        } catch (err) {
+            io.to(socket.roomId).emit('project-message', {
+                message: 'AI service is overloaded. Please try again later.',
+                sender: { _id: 'ai', name: 'AI Assistant', email: 'ai@ai.com' }
+            });
+        }
     });
 
     socket.on('event', data => { /* … */ });
