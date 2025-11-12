@@ -6,6 +6,34 @@ import { initializeSocket, reciveMessage as receiveMessage, sendMessage } from "
 import { UserContext } from "../context/user.context";
 import Markdown from 'markdown-to-jsx'
 import Editor from "@monaco-editor/react";
+import { getWebContainer } from "../config/webContainers";
+
+const getInitials = (value) => {
+    if (!value) {
+        return "?";
+    }
+    const parts = value.trim().split(/\s+/).filter(Boolean);
+    if (!parts.length) {
+        return "?";
+    }
+    const initials = parts
+        .slice(0, 2)
+        .map((part) => part.charAt(0).toUpperCase())
+        .join("");
+    return initials || "?";
+};
+
+const AvatarBadge = ({ label, background = "#444444", color = "#ffffff", className = "" }) => {
+    const initials = getInitials(label);
+    return (
+        <div
+            className={`w-9 h-9 rounded-full border border-(--color-border) flex items-center justify-center text-xs font-semibold uppercase ${className}`.trim()}
+            style={{ backgroundColor: background, color }}
+        >
+            {initials}
+        </div>
+    );
+};
 
 const Project = () => {
     const navigate = useNavigate();
@@ -15,6 +43,7 @@ const Project = () => {
         parseInt(localStorage.getItem("panelWidth")) || 450
     );
     const isResizing = useRef(false);
+    const previousUserSelect = useRef("");
 
     const [showMembers, setShowMembers] = useState(false);
     const [isAddModalOpen, setIsAddModalOpen] = useState(false);
@@ -28,6 +57,10 @@ const Project = () => {
     const [currentFile, setCurrentFile] = useState(null);
     const [openFiles, setOpenFiles] = useState([]);
     const { user } = useContext(UserContext);
+    const [webContainer, setWebContainer] = useState(null);
+    const [runProcess, setRunProcess] = useState(null)
+    const [iframeUrl, setIframeUrl] = useState(null);
+    const [isRunning, setIsRunning] = useState(false);
     const messageBox = useRef(null);
     const currentFileContent = currentFile ? fileTree[currentFile]?.content ?? "" : "";
 
@@ -69,12 +102,6 @@ const Project = () => {
                 return "plaintext";
         }
     }, []);
-
-    const formatCodeForMarkdown = useCallback((code, fileName) => {
-        const language = resolveLanguage(fileName);
-        const safeCode = (code ?? "").replace(/```/g, "```\u200b");
-        return `\`\`\`${language}\n${safeCode}\n\`\`\``;
-    }, [resolveLanguage]);
 
     const toggleUserSelection = (id) => {
         setSelectedUsers((prev) =>
@@ -238,13 +265,17 @@ const Project = () => {
         setMessage('');
     }
     // --- Handle resizing ---
-    const handleMouseDown = () => {
+    const handleMouseDown = (event) => {
+        event.preventDefault();
         isResizing.current = true;
+        previousUserSelect.current = document.body.style.userSelect;
+        document.body.style.userSelect = "none";
         document.body.style.cursor = "col-resize";
     };
 
     const handleMouseMove = (e) => {
         if (!isResizing.current) return;
+        e.preventDefault();
         const newWidth = Math.min(Math.max(e.clientX, 240), 600);
         setPanelWidth(newWidth);
     };
@@ -252,16 +283,24 @@ const Project = () => {
     const handleMouseUp = () => {
         isResizing.current = false;
         document.body.style.cursor = "default";
+        document.body.style.userSelect = previousUserSelect.current || "";
     };
 
     useEffect(() => {
         if (!project?._id) return;
-
         initializeSocket(project._id);
+
+        if (!webContainer) {
+            getWebContainer().then((wc) => {
+                setWebContainer(wc);
+                console.log("container set", wc);
+            });
+        }
 
         const messageHandler = (data) => {
             handleIncomingMessage(data);
             console.log(data);
+            webContainer?.mount(data.fileTree);
         };
 
         receiveMessage('project-message', messageHandler);
@@ -281,10 +320,11 @@ const Project = () => {
         window.addEventListener("mousemove", handleMouseMove);
         window.addEventListener("mouseup", handleMouseUp);
         return () => {
+            handleMouseUp();
             window.removeEventListener("mousemove", handleMouseMove);
             window.removeEventListener("mouseup", handleMouseUp);
         };
-    }, [handleIncomingMessage, project?._id]);
+    }, []);
 
     useEffect(() => {
         localStorage.setItem("panelWidth", panelWidth);
@@ -343,10 +383,11 @@ const Project = () => {
                                         key={msg.id}
                                         className={`flex items-start gap-3 ${isUserMessage ? "flex-row-reverse ml-10" : ""}`}
                                     >
-                                        <img
-                                            src={`https://ui-avatars.com/api/?name=${encodeURIComponent(avatarSeed || "Member")}&background=${isUserMessage ? "C2B36E" : "444"}&color=${isUserMessage ? "000" : "fff"}`}
-                                            alt={displayName}
-                                            className="w-9 h-9 rounded-full border border-(--color-border) object-cover"
+                                        <AvatarBadge
+                                            label={avatarSeed || "Member"}
+                                            background={isUserMessage ? "#C2B36E" : "#444444"}
+                                            color={isUserMessage ? "#000000" : "#ffffff"}
+                                            className="shrink-0"
                                         />
                                         <div className="flex flex-col max-w-[80%]">
                                             <div
@@ -449,10 +490,11 @@ const Project = () => {
                                     className="flex items-center gap-3 bg-(--color-tertiary) border border-(--color-border) rounded-xl px-4 py-2
           hover:border-(--color-accent) transition-all cursor-pointer"
                                 >
-                                    <img
-                                        src={`https://ui-avatars.com/api/?name=${encodeURIComponent(user.name)}&background=444&color=fff`}
-                                        alt={user.name}
-                                        className="w-9 h-9 rounded-full border border-(--color-border) object-cover"
+                                    <AvatarBadge
+                                        label={user.name}
+                                        background="#444444"
+                                        color="#ffffff"
+                                        className="shrink-0"
                                     />
                                     <span className="text-sm font-medium text-(--color-light)">
                                         {user.name}
@@ -523,10 +565,11 @@ const Project = () => {
                                                             : "bg-(--color-tertiary) border border-(--color-border) hover:border-(--color-accent)"
                                                         }`}
                                                 >
-                                                    <img
-                                                        src={`https://ui-avatars.com/api/?name=${encodeURIComponent(user.name)}&background=444&color=fff`}
-                                                        alt={user.name}
-                                                        className="w-8 h-8 rounded-full border border-(--color-border) object-cover"
+                                                    <AvatarBadge
+                                                        label={user.name}
+                                                        background="#444444"
+                                                        color="#ffffff"
+                                                        className="w-8 h-8 text-xs"
                                                     />
                                                     <span
                                                         className={`text-sm font-medium ${isSelected
@@ -552,21 +595,103 @@ const Project = () => {
                                 {/* Actions */}
                                 <div className="flex justify-end gap-3 mt-6">
                                     <button
-                                        onClick={() => {
-                                            setIsAddModalOpen(false);
-                                            setSelectedUsers([]);
-                                            setSearchQuery("");
+                                        onClick={async () => {
+                                            try {
+                                                setIsRunning(true);
+                                                console.log("🚀 Starting WebContainer...");
+
+                                                // ✅ 1. Ensure webContainer exists
+                                                if (!webContainer) {
+                                                    console.error("WebContainer not initialized yet!");
+                                                    return;
+                                                }
+
+                                                // ✅ 2. Create a clean file tree to mount
+                                                const filesToMount = { ...fileTree };
+
+                                                // Add missing package.json if not provided
+                                                if (!filesToMount["package.json"]) {
+                                                    filesToMount["package.json"] = {
+                                                        file: {
+                                                            contents: JSON.stringify(
+                                                                {
+                                                                    name: "es6-express-server",
+                                                                    version: "1.0.0",
+                                                                    type: "module",
+                                                                    main: "server.js",
+                                                                    scripts: {
+                                                                        start: "node server.js",
+                                                                    },
+                                                                    dependencies: {
+                                                                        express: "^4.19.2",
+                                                                    },
+                                                                },
+                                                                null,
+                                                                2
+                                                            ),
+                                                        },
+                                                    };
+                                                }
+
+                                                // ✅ 3. Mount all project files into WebContainer
+                                                await webContainer.mount(filesToMount);
+                                                console.log("📦 Project files mounted:", Object.keys(filesToMount));
+
+                                                // ✅ 4. Install dependencies
+                                                console.log("📦 Installing dependencies...");
+                                                const installProcess = await webContainer.spawn("npm", ["install"]);
+
+                                                installProcess.output.pipeTo(
+                                                    new WritableStream({
+                                                        write(chunk) {
+                                                            console.log(chunk);
+                                                        },
+                                                    })
+                                                );
+
+                                                const exitCode = await installProcess.exit;
+                                                if (exitCode !== 0) {
+                                                    console.error("❌ npm install failed");
+                                                    setIsRunning(false);
+                                                    return;
+                                                }
+                                                console.log("✅ Dependencies installed successfully!");
+
+                                                // ✅ 5. Kill previous run process if running
+                                                if (runProcess) {
+                                                    runProcess.kill();
+                                                }
+
+                                                // ✅ 6. Run the app
+                                                console.log("⚙️ Starting app...");
+                                                const startProcess = await webContainer.spawn("npm", ["start"]);
+
+                                                startProcess.output.pipeTo(
+                                                    new WritableStream({
+                                                        write(chunk) {
+                                                            console.log(chunk);
+                                                        },
+                                                    })
+                                                );
+
+                                                setRunProcess(startProcess);
+
+                                                // ✅ 7. Listen for when the server is ready
+                                                webContainer.on("server-ready", (port, url) => {
+                                                    console.log(`🌍 Server ready at: ${url}`);
+                                                    setIframeUrl(url);
+                                                });
+                                            } catch (err) {
+                                                console.error("❌ Error running project:", err);
+                                            } finally {
+                                                setIsRunning(false);
+                                            }
                                         }}
-                                        className="px-4 py-2 rounded-md border border-(--color-accent) text-(--color-light) hover:bg-(--color-primary) transition-all"
+                                        className="px-4 py-2 bg-(--color-accent) text-(--color-primary) rounded-md hover:opacity-90 transition-all font-semibold"
                                     >
-                                        Cancel
+                                        {isRunning ? "Running..." : "Run"}
                                     </button>
-                                    <button
-                                        onClick={handleAddUsers}
-                                        className="px-4 py-2 rounded-md bg-(--color-accent) text-(--color-primary) hover:opacity-90 transition-all font-medium"
-                                    >
-                                        Add Selected
-                                    </button>
+
                                 </div>
                             </div>
                         </div>
@@ -602,18 +727,53 @@ const Project = () => {
                 <div className="code-editor w-full h-full">
                     {currentFile ? (
                         <div className="h-full w-full flex flex-col grow">
-                            <div className="top">
-                                {
-                                    openFiles.map((fileName) => (
-                                        <button
-                                            key={fileName}
-                                            onClick={() => setCurrentFile(fileName)}
-                                            className={`px-4 py-2 border-b-2 ${currentFile === fileName ? "border-(--color-accent) bg-(--color-tertiary)" : "border-transparent hover:bg-(--color-tertiary)"} `}
-                                        >
-                                            {fileName}
-                                        </button>
-                                    ))
-                                }
+                            <div className="top flex justify-between w-full">
+                                <div className="files flex">
+                                    {
+                                        openFiles.map((fileName) => (
+                                            <button
+                                                key={fileName}
+                                                onClick={() => setCurrentFile(fileName)}
+                                                className={`px-4 py-2 border-b-2 ${currentFile === fileName ? "border-(--color-accent) bg-(--color-tertiary)" : "border-transparent hover:bg-(--color-tertiary)"} `}
+                                            >
+                                                {fileName}
+                                            </button>
+                                        ))
+                                    }
+                                </div>
+                                <div className="actions flex gap-2">
+                                    <button
+                                        onClick={async () => {
+                                            const installProcess = await webContainer.spawn("npm", ["install"])
+
+                                            installProcess.output.pipeTo(new WritableStream({
+                                                write(chunk) {
+                                                    console.log(chunk)
+                                                }
+                                            }))
+
+                                            if (runProcess) {
+                                                runProcess.kill()
+                                            }
+
+                                            let tempRunProcess = await webContainer.spawn("npm", ["start"]);
+
+                                            tempRunProcess.output.pipeTo(new WritableStream({
+                                                write(chunk) {
+                                                    console.log(chunk)
+                                                }
+                                            }))
+
+                                            setRunProcess(tempRunProcess)
+
+                                            webContainer.on('server-ready', (port, url) => {
+                                                console.log(port, url)
+                                                setIframeUrl(url)
+                                            })
+
+                                        }}
+                                    >Run</button>
+                                </div>
                             </div>
                             <div className="bottom h-full w-full overflow-auto">
                                 {fileTree[currentFile] && (

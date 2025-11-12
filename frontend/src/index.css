@@ -76,12 +76,14 @@
 .bottom {
   scrollbar-width: thin;
   scrollbar-color: var(--color-accent) var(--color-tertiary);
-  overflow: auto;
-  scrollbar-gutter: stable;
+  overflow-x: auto;
+  overflow-y: auto;
+  scrollbar-gutter: stable both-edges;
 }
 
-.bottomx::-webkit-scrollbar {
-  width: 4px;
+.bottom::-webkit-scrollbar {
+  width: 6px;
+  height: 6px;
 }
 
 .bottom::-webkit-scrollbar-track {
